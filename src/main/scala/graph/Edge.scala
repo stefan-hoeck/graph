@@ -53,7 +53,7 @@ object Edge {
    * vertices a and b
    */
   def apply(a: Int, b: Int): Edge = {
-    require (a >= 0 && b >= 0)
+    require(a >= 0 && b >= 0 && a != b)
 
     if (a < 250 && b < 250) cache(a)(b)
     else create(a, b)
