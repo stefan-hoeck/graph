@@ -1,5 +1,7 @@
 package graph
 
+import scala.collection.mutable.BitSet
+
 /** Algorithms dealing with graph isomorphism detection and
   * canonical labelings
   */
@@ -28,8 +30,24 @@ object iso {
     //it can be higher.
     val maxDegree = g.degrees.max
 
+    val cells = BitSet(0)
+
+    def refine(alpha: BitSet = BitSet(0)) {
+      while(! alpha.isEmpty && cells.size < g.order) {
+        val w = findShatterer(alpha)
+        alpha -= w.start
+
+        cells foreach { i ⇒ 
+          val x = c(i)
+          if (c.size > 1) shatter(x, w, alpha)
+        }
+      }
+    }
+
+    def findShatterer(alpha: BitSet): Cell = c(alpha.head)
+
     //x: cell to be shattered, w: shattering cell
-    def shatter(x: Cell, w: Cell) {
+    def shatter(x: Cell, w: Cell, alpha: BitSet) {
       val ds: Degrees = Array.fill(maxDegree + 1)(Nil)
 
       //fill degrees (in reverse order to keep order of vertices
@@ -37,10 +55,19 @@ object iso {
       x.end.to(x.start, -1) foreach { i ⇒ ds(degreeIn(i, w)) ::= p(i) }
       
       var actual = x.start
+      var largestSize = 0
+      var largest = x.start
+      val keepAll = alpha(x.start)
 
       ds foreach { is ⇒ 
         if (is.nonEmpty) {
-          val newCell = Cell(actual, is.size)
+          val size = is.size
+          val newCell = Cell(actual, size)
+
+          if (size > largestSize) { largestSize = size; largest = actual }
+          cells += actual
+          alpha += actual
+
           is foreach { i ⇒ 
             p(actual) = i
             c(actual) = newCell
@@ -48,6 +75,8 @@ object iso {
           }
         }
       }
+
+      if (!keepAll) alpha -= largest
     }
 
     def degreeIn(i: Int, w: Cell): Int =

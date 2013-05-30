@@ -10,14 +10,12 @@ class Iso extends BMark {
 
   override def setUp() { chains = graph.test.samples.chains100 }
 
-  def timeShatter(n: Int) = run(n) {
+  def timeRefine(n: Int) = run(n) {
     var res: Array[Int] = null
 
     chains.tail.tail foreach { c ⇒ 
       val i = new iso.Iso(c)
-      val cell = iso.Cell(0, c.order)
-      i.shatter(cell, cell)
-      i.shatter(i.c(2), i.c(0))
+      i.refine()
 
       res = i.p
     }
