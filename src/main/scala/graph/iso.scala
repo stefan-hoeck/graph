@@ -6,31 +6,31 @@ package graph
 object iso {
   private[iso] type Permutation = Array[Int] //mapping from new id to old id
   private[iso] type CellTo = Array[Cell] //mapping from id to Cell
-  private[iso] type Degrees = Array[List[Int]] //mapping from id to Cell
 
-  private[iso] final case class Cell(start: Int, size: Int) {
+  //mapping from degree to vertices
+  private[iso] type Degrees = Array[List[Int]]
+
+  private[graph] final case class Cell(start: Int, size: Int) {
     val end = start + size - 1
   }
 
-  private[iso] final class Iso(g: Graph) {
+  private[graph] final class Iso(g: Graph) {
     //the actual permutation of the original graph g
     //the value at p(i) is the vertex in g that will be
     //moved to vertex i in the new graph
     val p: Permutation = Array.range(0, g.order)
 
     //Mapping from vertex to cell
-    val c: CellTo = Array.fill(g.order)(Cell(0, g.order - 1))
+    val c: CellTo = Array.fill(g.order)(Cell(0, g.order))
 
     //The maximum degree of vertices in g
     //For molecules, this is typically limited to 4; on rare occasions
     //it can be higher.
     val maxDegree = g.degrees.max
 
-    val ds: Degrees = Array.fill(maxDegree + 1)(Nil)
-
     //x: cell to be shattered, w: shattering cell
     def shatter(x: Cell, w: Cell) {
-      clearDegrees()
+      val ds: Degrees = Array.fill(maxDegree + 1)(Nil)
 
       //fill degrees (in reverse order to keep order of vertices
       //with same degree)
@@ -49,8 +49,6 @@ object iso {
         }
       }
     }
-
-    def clearDegrees() { 0 until maxDegree foreach { i ⇒ ds(i) = Nil } }
 
     def degreeIn(i: Int, w: Cell): Int =
       g neighbors p(i) count (c(_).start == w.start)
