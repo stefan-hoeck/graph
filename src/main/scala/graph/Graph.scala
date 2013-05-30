@@ -117,6 +117,13 @@ sealed trait Graph {
     else this
   }
 
+  override def toString = {
+    val header = s"Unlabeled Graph, order: $order"
+    val es = edges.toList.sorted mkString "\n"
+
+    s"$header\n$es"
+  }
+
   /**
     * Alias for addVertex
     */
