@@ -11,13 +11,18 @@ object IsoTest extends Properties("iso") {
 
   property("refine_linear_permutation") = {
     def testPerm(g: Graph): Boolean = {
-      //the first and last vertice of a linear graph have degree 1
-      //all others have degree 2
-      val exp = List(0, g.order - 1) ::: List.range(1, g.order - 1)
-      val res = refinePermutation(g)
-      println(res)
+      val isEven = g.order % 2 == 0
+      val center = (g.order - 1) / 2
+      def distanceFromCenter(i: Int) = 
+        if (isEven && i > center) (center - i).abs - 1
+        else (center - i).abs
 
-      exp ≟ refinePermutation(g)
+      val exp = List(0, g.order - 1) :::
+                List.range(1, g.order - 1).sortBy(distanceFromCenter)
+
+      val res = refinePermutation(g)
+
+      exp ≟ res
     }
 
     chains100.tail ∀ testPerm
@@ -25,11 +30,15 @@ object IsoTest extends Properties("iso") {
 
   property("refine_linear_cells") = {
     def testCells(g: Graph): Boolean = {
-      val iniC = Cell(0, 2)
-      val restC = Cell(2, g.order - 2)
-      val exp = iniC :: iniC :: List.fill(g.order - 2)(restC)
+      val cells = refineCells(g)
+      val center = if (g.order % 2 == 0) -1 else g.order / 2
 
-      exp ≟ refineCells(g)
+      def test(i: Int) = {
+        val c = cells(i)
+        if (i == center) c.size == 1 else c.size == 2
+      }
+
+      (0 until g.order).toList ∀ test
     }
 
     chains100.tail ∀ testCells
@@ -49,17 +58,11 @@ object IsoTest extends Properties("iso") {
     rings100.tail ∀ testCells
   }
 
-  def refinePermutation(g: Graph): List[Int] =
-    refine(g).p.toList
+  def refinePermutation(g: Graph): List[Int] = refine(g)._1
 
-  def refineCells(g: Graph): List[Cell] =
-    refine(g).c.toList
+  def refineCells(g: Graph): List[Cell] = refine(g)._2
 
-  def refine(g: Graph): Iso = {
-    val res = new Iso(g)
-    res.refine()
-    res
-  }
+  def refine(g: Graph): (List[Int], List[Cell]) = iso refine g
 }
 
 // vim: set ts=2 sw=2 et:

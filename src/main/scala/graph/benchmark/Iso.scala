@@ -1,24 +1,27 @@
 package graph.benchmark
 
 import graph._
+import com.google.caliper.Param
 
 /** Better to create new ds in method `shatter` than have a shared
   * one and update it with every iteration
   */
-class Iso extends BMark {
+class IsoBenchmark extends BMark {
+  @Param(Array("10", "100", "500")) val size = 0
   var chains: List[Graph] = Nil
+  var rings: List[Graph] = Nil
 
-  override def setUp() { chains = graph.test.samples.chains100 }
+  override def setUp() {
+    chains = graph.test.samples.chains(size)
+    rings = graph.test.samples.rings(size)
+  }
 
-  def timeRefine(n: Int) = run(n) {
-    var res: Array[Int] = null
+  def timeRefineChains(n: Int) = run(n) {
+    chains.tail.tail foreach { iso.refine }
+  }
 
-    chains.tail.tail foreach { c ⇒ 
-      val i = new iso.Iso(c)
-      i.refine()
-
-      res = i.p
-    }
+  def timeRefineRings(n: Int) = run(n) {
+    chains.tail.tail foreach { iso.refine }
   }
 }
 

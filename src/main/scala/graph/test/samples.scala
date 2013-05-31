@@ -18,6 +18,20 @@ object samples {
   /** linear graphs (chains) of order 1 to 100 */
   def chains100: List[Graph] = chains(100)
 
+  def complex: Graph = Graph(Set(
+    Edge(0, 1),
+    Edge(1, 2),
+    Edge(1, 3),
+    Edge(3, 4),
+    Edge(3, 8),
+    Edge(4, 5),
+    Edge(4, 6),
+    Edge(5, 6),
+    Edge(5, 9),
+    Edge(6, 7),
+    Edge(7, 8)
+  ))
+
   /** cyclic graphs */
   def rings(n: Int): List[Graph] = n match {
     case x if x < 3 ⇒ Nil

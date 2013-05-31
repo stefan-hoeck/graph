@@ -5,7 +5,7 @@ import benchmark._
 
 object Main {
   def main(args: Array[String]) {
-    Runner.main(classOf[Dijkstra], args)
+    Runner.main(classOf[IsoBenchmark], args)
   }
 }
 
