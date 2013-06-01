@@ -4,7 +4,7 @@ import org.scalacheck._, Prop._
 import scalaz._, Scalaz._
 
 object IsoTest extends Properties("iso") {
-  import iso._
+  import iso2._
   import test.samples._
 
   implicit val CellEqual: Equal[Cell] = Equal.equalA
@@ -62,7 +62,7 @@ object IsoTest extends Properties("iso") {
 
   def refineCells(g: Graph): List[Cell] = refine(g)._2
 
-  def refine(g: Graph): (List[Int], List[Cell]) = iso refine g
+  def refine(g: Graph): (List[Int], List[Cell]) = iso2 refine g
 }
 
 // vim: set ts=2 sw=2 et:

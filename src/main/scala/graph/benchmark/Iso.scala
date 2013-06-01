@@ -5,6 +5,13 @@ import com.google.caliper.Param
 
 /** Better to create new ds in method `shatter` than have a shared
   * one and update it with every iteration
+  *
+  * Mutable vs. immutable BitSets:
+  * Both perform equally well for smaller molecules (size = 10, 100) but
+  * mutable ones are about twice as fast for larger molecules (size = 500)
+  * This was tested for refinement only. When we have to make clones of
+  * mutable bitsets, immutable might look even more favorable.
+  *
   */
 class IsoBenchmark extends BMark {
   @Param(Array("10", "100", "500")) val size = 0
@@ -22,6 +29,14 @@ class IsoBenchmark extends BMark {
 
   def timeRefineRings(n: Int) = run(n) {
     chains.tail.tail foreach { iso.refine }
+  }
+
+  def timeRefineChains2(n: Int) = run(n) {
+    chains.tail.tail foreach { iso2.refine }
+  }
+
+  def timeRefineRings2(n: Int) = run(n) {
+    chains.tail.tail foreach { iso2.refine }
   }
 }
 

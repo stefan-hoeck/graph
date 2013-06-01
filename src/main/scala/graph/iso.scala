@@ -1,6 +1,10 @@
 package graph
 
-import scala.collection.mutable.BitSet
+import scala.collection.immutable.BitSet
+import scala.collection.mutable.{BitSet ⇒ MBitSet}
+import spire.syntax.cfor
+import scalaz.syntax.order._
+import scalaz.std.set._
 
 /** Algorithms dealing with graph isomorphism detection and
   * canonical labelings
@@ -20,6 +24,7 @@ final case class Cell(start: Int, size: Int) {
   val end = start + size - 1
 }
 
+//cfor faster than Range.foreach
 private[graph] final class Iso(g: Graph) {
   //the actual permutation of the original graph g
   //the value at p(i) is the vertex in g that will be
@@ -29,64 +34,82 @@ private[graph] final class Iso(g: Graph) {
   //Mapping from vertex to cell
   val c: Array[Cell] = Array.fill(g.order)(Cell(0, g.order))
 
-  //The maximum degree of vertices in g
-  //For molecules, this is typically limited to 4; on rare occasions
-  //it can be higher.
-  val maxDegree = g.degrees.max
+  //Size of Array for listing degrees
+  //For molecules, this is typically small (5 or lower)
+  val dsSize = g.degrees.max + 1
 
   //Start index in p of each cell
-  val cells = BitSet(0)
+  var cells = BitSet(0)
+
+  var nonSingletons = if (g.order > 1) BitSet(0) else BitSet()
 
   def fromCellIndex(i: Int): Cell = c(p(i))
 
-  def refine(alpha: BitSet = BitSet(0)) {
+  def canonical(): Array[Int] = {
+    var result = p.clone
+    var best: Set[Edge] = g.edges
 
-    def findShatterer: Cell = fromCellIndex(alpha.head)
+    refine()
 
-    while(! alpha.isEmpty && cells.size < g.order) {
-      val w = findShatterer
-      alpha -= w.start
+    def undoChanges {}
+    def transmuteEdges: Set[Edge] = ???
 
-      cells foreach { i ⇒ 
-        val x = fromCellIndex(i)
-        if (x.size > 1) shatter(x, w, alpha)
+    def searchTree() {
+      if (nonSingletons.isEmpty) {
+        val es = transmuteEdges
+        if (es lt best) {
+          result = p.clone
+          best = es
+        }
       }
+      else {}
     }
+
+    searchTree()
+
+    result
   }
 
-  //x: cell to be shattered, w: shattering cell
-  def shatter(x: Cell, w: Cell, alpha: BitSet) {
-    var cursor = x.start
-    var minD = Int.MaxValue
-    var maxD = Int.MinValue
-    val ds = Array.fill(maxDegree + 1)(List[Int]())
+  def refine(alpha: BitSet = BitSet(0)) {
+    var a = alpha
 
-    //fill degrees (in reverse order to keep order of vertices
-    //with same degree)
-    x.end.to(x.start, -1) foreach { i ⇒ 
-      val index = p(i)
-      val d = degreeIn(index, w)
+    def findShatterer: Cell = fromCellIndex(a.firstKey)
 
-      if (d < minD) minD = d
-      if (d > maxD) maxD = d
-      ds(d) ::= index
-    }
+    //x: cell to be shattered, w: shattering cell
+    def shatter(x: Cell, w: Cell) {
+      val ds: Array[List[Int]] = Array.fill(dsSize)(Nil)
+      var cursor = x.start
+      var minD = Int.MaxValue
+      var maxD = Int.MinValue
 
-    if (minD != maxD) {
-      var largestSize = -1 //size of the largest cell generated
-      var largest = -1 //start index of largest cell
-      //if x is in alpha, keep all fragments, else add all but one of
-      //the largest
-      val keepAll = alpha(x.start)
-      ds foreach { is ⇒ 
-        if (is.nonEmpty) {
+      //fill degrees (in reverse order to keep order of vertices
+      //with same degree)
+      //keep track of maximum and minimum degree found
+      cfor(x.end)(_ >= x.start, _ - 1) { i ⇒ 
+        val index = p(i)
+        val d = degreeIn(index, w)
+
+        minD = d min minD
+        maxD = d max maxD
+        ds(d) ::= index
+      }
+
+      if (minD != maxD) {
+        var largestSize = -1 //size of the largest cell generated
+        var largest = -1 //start index of largest cell
+        val keepAll = a(x.start) //keep all fragments if x is in alpha
+
+        nonSingletons -= cursor
+
+        for {is ← ds; if is.nonEmpty} {
           val size = is.size
           val newCell = Cell(cursor, size)
 
           if (size > largestSize) { largestSize = size; largest = cursor }
+          if (size > 1) { nonSingletons += cursor }
 
           cells += cursor
-          alpha += cursor
+          a += cursor
 
           is foreach { i ⇒ 
             p(cursor) = i
@@ -94,13 +117,28 @@ private[graph] final class Iso(g: Graph) {
             cursor += 1
           }
         }
+
+        if (!keepAll) { a -= largest }
       }
-      if (!keepAll) { alpha -= largest }
+    }
+
+    while(a.nonEmpty && nonSingletons.nonEmpty) {
+      val w = findShatterer
+      a -= w.start
+
+      nonSingletons foreach { i ⇒ shatter(fromCellIndex(i), w) }
     }
   }
 
-  def degreeIn(i: Int, w: Cell): Int =
-    g neighbors i count (c(_).start == w.start)
+
+  //about 15% faster than g neighbors count { c(_).start == w.start }
+  def degreeIn(i: Int, w: Cell): Int = {
+    var res = 0
+    g neighbors i foreach { i ⇒ 
+      if (c(i).start == w.start) res += 1
+    }
+    res
+  }
 }
 
 // vim: set ts=2 sw=2 et:

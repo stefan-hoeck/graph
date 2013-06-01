@@ -32,6 +32,7 @@ object Dependencies {
   val scalaz_concurrent = scalaz %% "scalaz-concurrent" % scalazV
   val scalaz_iteratee = scalaz %% "scalaz-iteratee" % scalazV
   val scalaz_scalacheck = scalaz %% "scalaz-scalacheck-binding" % scalazV % "test"
+  val spire = "org.spire-math" %% "spire" % "0.4.0"
 
   val scalacheck = "org.scalacheck" %% "scalacheck" % "1.10.0" % "test"
 
@@ -53,7 +54,7 @@ object UtilBuild extends Build {
     settings = addDeps (scalaz_core, scalaz_concurrent,
                         scalaz_effect, scalaz_iteratee,
                         scalaz_scalacheck, scalacheck,
-                        caliper)
+                        caliper, spire)
   )
 }
 
