@@ -6,13 +6,10 @@ import spire.syntax.cfor
 
 //Less mutability, more recursion. Immutable BitSets are FAST
 package object iso2 {
-  type Partition = Array[Int]
   type Cells = Array[Cell]
   type Degrees = Array[List[Int]]
-
-  final case class Cell(start: Int, size: Int) {
-    val end = start + size - 1
-  }
+  type Orbits = Array[BitSet]
+  type Partition = Array[Int]
 
   /** Calculates the degree of a node i into a cell w */
   def degreeIn(i: Int, w: Cell)(implicit I: IsoI, M: IsoM): Int = {
@@ -40,24 +37,33 @@ package object iso2 {
     run(x.end, Int.MaxValue, Int.MinValue)
   }
 
+  def initialCellSets(g: Graph) = CellSets(
+    BitSet(0), if (g.order > 1) BitSet(0) else BitSet(), BitSet(0)
+  )
+
+  def initialIsoM(g: Graph) = new IsoM(
+    Array.range(0, g.order),
+    Array.fill(g.order)(Cell(0, g.order))
+  )
+
   //For testing
   def refine(g: Graph): (List[Int], List[Cell]) = {
     implicit val i = new IsoI(g)
     implicit val m = initialIsoM(g)
-    refineSets(initialShatterSets(g))
+    refineSets(initialCellSets(g))
 
     (m.p.toList, m.c.toList)
   }
 
-  def refineSets(sets: ShatterSets)
-            (implicit I: IsoI, M: IsoM): ShatterSets = {
-    def findShatterer(s: ShatterSets) = M fromCellIndex s.alpha.firstKey
+  def refineSets(sets: CellSets)
+                (implicit I: IsoI, M: IsoM): CellSets = {
+    def findShatterer(s: CellSets) = M fromCellIndex s.alpha.firstKey
     @tailrec
-    def run(s: ShatterSets): ShatterSets =
+    def run(s: CellSets): CellSets =
       if (s.alpha.isEmpty || s.nonS.isEmpty) s
       else {
         val w = findShatterer(s)
-        var next = ShatterSets(s.pi, s.nonS, s.alpha - w.start)
+        var next = CellSets(s.pi, s.nonS, s.alpha - w.start)
         s.nonS foreach { i ⇒ next = shatter(M fromCellIndex i, w, next) }
 
         run(next)
@@ -66,12 +72,14 @@ package object iso2 {
       run(sets)
   }
 
-  def shatter(x: Cell, w: Cell, sets: ShatterSets)
-             (implicit I: IsoI, M: IsoM): ShatterSets = fillDegrees(x, w) match {
+  def searchTree(sets: CellSets)(implicit I: IsoI, M: IsoM): IsoResult = ???
+
+  def shatter(x: Cell, w: Cell, sets: CellSets)
+             (implicit I: IsoI, M: IsoM): CellSets = fillDegrees(x, w) match {
     case null ⇒ sets
     case ds   ⇒ {
       var cursor = x.start
-      var ShatterSets(pi, nonS, a) = sets
+      var CellSets(pi, nonS, a) = sets
       var largestSize = -1 //size of the largest cell generated
       var largest = -1 //start index of largest cell
       val keepAll = a(x.start) //keep all fragments if x is in alpha
@@ -97,8 +105,12 @@ package object iso2 {
 
       if (!keepAll) { a -= largest }
 
-      ShatterSets(pi, nonS, a)
+      CellSets(pi, nonS, a)
     }
+  }
+
+  final case class Cell(start: Int, size: Int) {
+    val end = start + size - 1
   }
 
   /** The immutable part of a graph isomorphism calculation */
@@ -116,20 +128,15 @@ package object iso2 {
     def fromCellIndex(i: Int): Cell = c(p(i))
   }
 
-  def initialShatterSets(g: Graph) = ShatterSets(
-    BitSet(0), if (g.order > 1) BitSet(0) else BitSet(), BitSet(0)
-  )
-
-  def initialIsoM(g: Graph) = new IsoM(
-    Array.range(0, g.order),
-    Array.fill(g.order)(Cell(0, g.order))
-  )
-
-  final case class ShatterSets(
+  final case class CellSets(
     pi: BitSet, //start indices of all cells
     nonS: BitSet, //start indices of non-singleton cells
     alpha: BitSet //start indices of possible shatterers
   )
+
+  final class IsoResult(val orbits: Orbits, val p: Partition)(implicit I: IsoI) {
+     
+  }
 }
 
 // vim: set ts=2 sw=2 et:
