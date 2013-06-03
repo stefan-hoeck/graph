@@ -35,7 +35,7 @@ object Permutation {
     * The number of elements in the `Iterator` is n!
     */
   def ofSize(n: Int): Iterator[Permutation] =
-    (0 to n permutations) map { is ⇒ Permutation(is.toArray) }
+    (0 until n permutations) map { is ⇒ Permutation(is.toArray) }
 
   implicit val Group = new spire.algebra.Group[Permutation] {
     def inverse(p: Permutation) = p.inverse
