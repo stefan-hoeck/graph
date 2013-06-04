@@ -1,5 +1,6 @@
 package graph.test
 
+import annotation.tailrec
 import graph.{Graph, Edge}
 import scalaz._, Scalaz._
 
@@ -9,22 +10,11 @@ object samples {
   val single = Graph.empty.addVertex
 
   def allOfOrder(n: Int): List[Graph] = {
-    val MaxA = n - 1
-    val MaxB = n - 2
+    type Edges = List[Set[Edge]]
+    def accum(es: Edges, e: Edge) = es ::: es.map(_ + e)
+    def edges = for { i ← 1 until n; j ← 0 until i } yield Edge(i, j)
 
-    def enum(a: Int, b: Int, es: Set[Edge]): List[Graph] = {
-      val newEs = (a > b) ? List(es, es + Edge(a, b)) | Nil
-
-      a match {
-        case MaxA ⇒ newEs map { Graph(n, _) }
-        case `b`  ⇒ Nil
-        case _    ⇒ newEs flatMap { es ⇒ 
-          enum(a, b + 1, es) ::: enum(a + 1, b, es)
-        }
-      }
-    }
-
-    if (n <= 0) List(Graph.empty) else enum(1, 0, Set.empty)
+    edges.foldLeft(List(Set.empty): Edges)(accum) map { Graph(n, _) }
   }
 
   /** linear graphs (chains) of order 1 to n */
@@ -60,5 +50,10 @@ object samples {
   /** cycles of order 3 to 100 */
   def rings100: List[Graph] = rings(100)
 }
+
+//1 0   → none, 1 ~ 0
+//2 0   → none, 1 ~ 0, 2 ~ 0, 2 ~ 0, 1 ~ 0
+//1 1   → none, 1 ~ 0, 2 ~ 0, 2 ~ 0, 1 ~ 0
+//2 1   → none, all combos
 
 // vim: set ts=2 sw=2 et:
