@@ -7,22 +7,70 @@ import scalaz._, Scalaz._
 
 //Less mutability, more recursion. Immutable BitSets are FAST
 package object iso2 {
+  private val EmptyBS = BitSet()
+
+  private val ZeroBS = BitSet(0)
+
+  /** Type alias for a mapping from node index to `Cell`
+    *
+    * The indexing is with respect of a node's index in the graph
+    * that is to be canonized, not with respect to the actual
+    * `Partition` on the way to a canonical form
+    */
   type Cells = Array[Cell]
-  type Degrees = Array[List[Int]]
+
+  /** The orbits of a graph's automorphism group
+    *
+    * If there is an automorphism connecting two nodes
+    * in a graph, the two nodes are in the same orbit.
+    * An entry at index i points to a `BitSet` of indices
+    * containing i and all other indices of i's orbit
+    *
+    * Orbits are needed to prune the search tree when
+    * finding a canonical labeling, but they can also
+    * be of interest in other applications for instance
+    * when finding chiral centers in a Molecule
+    */
   type Orbits = Array[BitSet]
+
+  /** An ordered partition of a graph's indices used
+    * by the algorithms in this module.
+    *
+    * A partition is typically wrapped in a `IsoM`
+    * object which comes together with a `Cells`
+    * array that tells us in what sets the elements
+    * of the partition are grouped.
+    *
+    * As an example, consider Isobutane whose indices
+    * are in a first step grouped by degree. The resulting
+    * partition will then be `(0, 3, 4, 2, 1), where vertices
+    * 0, 3, and 4 are of degree 1, vertice 2 is of degree 2,
+    * and vertice 1 is of degree 3.
+    *
+    * The corresponding `Cells` array will look like so:
+    * (Cell(0, 3), Cell(4, 1), Cell(3, 1), Cell(0, 3), Cell(0, 3)).
+    * Note that a cell gives the start index in the partition and
+    * the number of elements in the cell. Note also that the
+    * entries in the cell array are place at the index of a
+    * vertice in the original graph. For instance, the tertiary
+    * carbon has index 1 in the original graph. The cell array
+    * at index 1 points to the cell with size 1 starting at position 4
+    * in the actual partition.
+    */
   type Partition = Array[Int]
 
-  def solve(g: Graph): (Permutation, Orbits) = {
-    val res = searchTree(initialCellSets(g),
-      initialResult(g), initialIsoM(g))(new IsoI(g))._1
+  type Degrees = Array[List[Int]]
 
-    (res.p, res.orbits)
-  }
+  def solve(g: Graph): (Permutation, Orbits) = IsoI(g).solve
 
   /** Calculates the degree of a node i into a cell w */
   def degreeIn(i: Int, w: Cell)(implicit I: IsoI, M: IsoM): Int = {
     var res = 0
-    I.g neighbors i foreach { i ⇒ if (M.c(i).start == w.start) res += 1 }
+
+    I.g neighbors i foreach { graphIndex ⇒ 
+      if (M.cellAtGraphIndex(graphIndex).start == w.start) res += 1
+    }
+
     res //benchmarked and optimized
   }
 
@@ -45,20 +93,7 @@ package object iso2 {
     run(x.end, Int.MaxValue, Int.MinValue)
   }
 
-  def initialCellSets(g: Graph) = CellSets(
-    BitSet(0), if (g.order > 1) BitSet(0) else BitSet(), BitSet(0)
-  )
 
-  def initialIsoM(g: Graph) = new IsoM(
-    Array.range(0, g.order),
-    Array.fill(g.order)(Cell(0, g.order))
-  )
-
-  def initialOrbits(g: Graph): Orbits =
-    Array.tabulate(g.order)(BitSet(_))
-
-  def initialResult(g: Graph) = IsoResult(initialOrbits(g),
-    ∅[Permutation], List.fill(g.order)(Edge(g.order, g.order - 1)))
 
   def mergeOrbits(a: Orbits, b: Orbits): Orbits = {
     val res = Array.tabulate(a.size){ i ⇒ a(i) | b(i) }
@@ -110,26 +145,26 @@ package object iso2 {
 
   //For testing
   def refine(g: Graph): (List[Int], List[Cell]) = {
-    implicit val i = new IsoI(g)
-    implicit val m = initialIsoM(g)
-    refineSets(initialCellSets(g))
+    implicit val i = IsoI(g)
+    implicit val m = i.initialIsoM
 
-    (m.p.toList, m.c.toList)
+    refineSets(i.initialCellSets)
+
+    m.lists
   }
 
   def refineSets(sets: CellSets)
                 (implicit I: IsoI, M: IsoM): CellSets = {
-    def findShatterer(s: CellSets) = M fromCellIndex s.alpha.firstKey
     @tailrec
     def run(s: CellSets): CellSets =
       if (s.alpha.isEmpty || s.nonS.isEmpty) s
       else {
-        val w = findShatterer(s)
-        println(s"Shattering with $w")
+        val w = M findShatterer s
         var next = CellSets(s.pi, s.nonS, s.alpha - w.start)
-        s.nonS foreach { i ⇒ next = shatter(M fromCellIndex i, w, next) }
+        s.nonS foreach { partitionIndex ⇒ 
+          next = shatter(M cellAtPartitionIndex partitionIndex, w, next)
+        }
 
-        assert(next != s, s"$next")
         run(next)
       }
 
@@ -138,29 +173,25 @@ package object iso2 {
 
   def searchTree(sets: CellSets, best: IsoResult, m: IsoM)
     (implicit I: IsoI): (IsoResult, Boolean) = {
-    println(s"Refining: $m; $sets")
     val refined = refineSets(sets)(I, m)
-    println(s"Refined to: $m")
 
     if (refined.nonS.isEmpty) {
-      val perm = Permutation(m.p)
-      println(s"Solution found: $perm")
-      best next perm
-    } else {
-      val cell = m c refined.nonS.head
-      var handled: BitSet = BitSet()
-      var ignore: BitSet = BitSet()
+      best next m.permutation
+    }
+    else {
+      val cell = m cellAtPartitionIndex refined.nonS.head
+      var handled: BitSet = EmptyBS
+      var ignore: BitSet = EmptyBS
       var result = best
       var orbitsChanged = false
 
-      cfor(cell.start)(_ <= cell.end, _ + 1){ i ⇒ 
-        if (! ignore(i)) {
-          val p = splitAt(refined, m, i)
+      cfor(cell.start)(_ <= cell.end, _ + 1){ partitionIndex ⇒ 
+        val graphIndex = m p partitionIndex
+        if (! ignore(graphIndex)) {
+          val p = splitAt(refined, m, partitionIndex)
           val (nextM, nextSets) = p
-          println(s"Splitting at: $i, $m")
-          println(nextSets)
-          handled += i
-          ignore ++= result.orbits(i)
+          handled += graphIndex
+          ignore ++= result.orbitsOriginal(graphIndex)
           val (newRes, changed) = searchTree(nextSets, result, nextM)
           if (changed) { orbitsChanged = true }
           result = newRes
@@ -171,22 +202,21 @@ package object iso2 {
     }
   }
 
-  def splitAt(c: CellSets, m: IsoM, i: Int): (IsoM, CellSets) = {
-    val cell = m.c(m.p(i))
-    println(s"Splitting $cell at $i")
+  def splitAt(c: CellSets, m: IsoM, partitionIndex: Int)
+    : (IsoM, CellSets) = {
+    val cell = m cellAtPartitionIndex partitionIndex
     val newCell = Cell(cell.start, cell.size - 1)
     val newIsoM = m.copy()
-    val image = m.p(i)
+    val image = m p partitionIndex
     val newNonS = if (newCell.size > 1) c.nonS else c.nonS - cell.start
 
-    cfor(cell.start)(_ < cell.end, _ + 1){ j ⇒ 
-      if (j >= i) newIsoM.p(j) = newIsoM.p(j + 1)
-      newIsoM.c(j) = newCell
+    cfor(cell.start)(_ < cell.end, _ + 1){ pi ⇒ 
+      if (pi >= partitionIndex) newIsoM.p(pi) = newIsoM.p(pi + 1)
+      newIsoM.setCellAtPartitionIndex(pi, newCell)
     }
 
     newIsoM.p(cell.end) = image
-    newIsoM.c(cell.end) = newCell
-    newIsoM.c(image) = Cell(cell.end, 1)
+    newIsoM.setCellAtPartitionIndex(cell.end, Cell(cell.end, 1))
 
     val sets = CellSets(c.pi + cell.end, newNonS, BitSet(cell.end))
 
@@ -205,8 +235,8 @@ package object iso2 {
 
       nonS -= cursor
 
-      for {is ← ds; if is.nonEmpty} {
-        val size = is.size
+      for {graphIndices ← ds; if graphIndices.nonEmpty} {
+        val size = graphIndices.size
         val newCell = Cell(cursor, size)
 
         if (size > largestSize) { largestSize = size; largest = cursor }
@@ -215,9 +245,9 @@ package object iso2 {
         pi += cursor
         a += cursor
 
-        is foreach { i ⇒ 
+        graphIndices foreach { i ⇒ 
           M.p(cursor) = i
-          M.c(i) = newCell
+          M.setCellAtGraphIndex(i, newCell)
           cursor += 1
         }
       }
@@ -228,25 +258,86 @@ package object iso2 {
     }
   }
 
+  /** A cell in an ordered partition of a graph's nodes
+    *
+    * `start` represents the initial index in the
+    * partition array, `size` the number of consecutive
+    * entries in the same array that contain the elements
+    * of this cell
+    */
   final case class Cell(start: Int, size: Int) {
+    /** The index of the last item of this cell in the partition array */
     val end = start + size - 1
   }
 
   /** The immutable part of a graph isomorphism calculation */
-  final class IsoI(val g: Graph) {
+  final case class IsoI(val g: Graph) {
     private val ds: Degrees = Array.fill(g.degrees.max + 1)(Nil)
 
+    val edges: List[Edge] = g.edges.toList
+
+    def order: Int = g.order
+
+    /** Returns a new array of empty lists that can be filled
+      * when generating the degrees the elements of one cell
+      * into another cell.
+      */
     def newDegrees: Degrees = ds.clone()
+
+    def initialCellSets = 
+      CellSets(ZeroBS, if (g.order > 1) ZeroBS else EmptyBS, ZeroBS)
+
+    def initialIsoM = new IsoM(
+      Array.range(0, order),
+      Array.fill(order)(Cell(0, order))
+    )
+
+    def initialOrbits: Orbits = Array.tabulate(order)(BitSet(_))
+
+    def initialResult: IsoResult = IsoResult(initialOrbits,
+      ∅[Permutation], List.fill(order)(Edge(order, order - 1)))(this)
+
+    def solve: (Permutation, Orbits) = {
+      val res =
+        searchTree(initialCellSets, initialResult, initialIsoM)(this)._1
+
+      (res.p, res.orbitsOriginal)
+    }
   }
 
   /** The (for efficiency reasons) mutable part of a graph isomorphism
-    * calculation */
-  final class IsoM(val p: Partition, val c: Cells) {
+    * calculation
+    */
+  final class IsoM(val p: Partition, c: Cells) {
+    /** Creates a clone of the mutable parts of this object */
     def copy(): IsoM = new IsoM(p.clone(), c.clone())
 
-    def fromCellIndex(i: Int): Cell = c(p(i))
+    def cellAtGraphIndex(i: Int): Cell = c(i)
 
-    override def toString = s"${p.toList}; ${c.toList}"
+    def setCellAtGraphIndex(i: Int, cell: Cell) { c(i) = cell }
+
+    def cellAtPartitionIndex(i: Int): Cell = c(p(i))
+
+    def setCellAtPartitionIndex(i: Int, cell: Cell) { c(p(i)) = cell }
+
+    def findShatterer(s: CellSets): Cell =
+      cellAtPartitionIndex(s.alpha.firstKey)
+
+    def permutation: Permutation = Permutation(p)
+
+    private[graph] def lists: (List[Int], List[Cell]) =
+      (p.toList, c.toList)
+
+    def cellList: List[Cell] = c.distinct sortBy { _.start } toList
+
+    def partitionList: List[List[Int]] =
+      cellList map { c ⇒ c.start to c.end map p toList }
+
+    override def toString = {
+      def inner = partitionList map { _ mkString ", " } mkString " | "
+
+      s"{$inner}"
+    }
   }
 
   final case class CellSets(
@@ -255,25 +346,37 @@ package object iso2 {
     alpha: BitSet //start indices of possible shatterers
   )
 
+  /** Result of solving the graph isomorphism problem.
+    *
+    * `orbitsOriginal` contains the orbits of the graph's automorphism group
+    * (given in the indices of the original graph)
+    * (see also description of `Orbits` type alias)
+    *
+    * `p` is the permutation that transforms the given graph to
+    * its canonically labeled form
+    *
+    * `edges` is a sorted image of the graph's edge set under the 
+    * given permutation. This is used to compare different `IsoResults`,
+    * both for finding the best one (the one giving the smallest
+    * sorted list of edges) and for finding automorphisms (if two
+    * distinct permutations lead to the same canonical form)
+    */
   final case class IsoResult(
-      orbits: Orbits,
+      orbitsOriginal: Orbits,
       p: Permutation,
-      edges: List[Edge]) {
-    def next(p1: Permutation)(implicit I: IsoI): (IsoResult, Boolean) = { 
+      edges: List[Edge])(implicit I: IsoI) {
+      
+    def next(p1: Permutation): (IsoResult, Boolean) = { 
       val inv = p1.inverse
-      val es = I.g.edges.toList map inv.mapEdge sorted
-
-      println(es)
-      println(edges)
-      println(edges ?|? es)
+      val es = I.edges map inv.mapEdge sorted
 
       edges ?|? es match {
         case Ordering.LT ⇒ (this, false)
-        case Ordering.GT ⇒ (IsoResult(orbits, inv, es), false)
+        case Ordering.GT ⇒ (IsoResult(orbitsOriginal, inv, es), false)
         case Ordering.EQ ⇒ {
-          val iso = p compose inv.inverse
-          val newOs = mergeOrbits(orbits, permutationToOrbits(inv, I.g.order))
-          println(s"Automorphism found: $iso")
+          val iso = p1 compose p
+          val newOs =
+            mergeOrbits(orbitsOriginal, permutationToOrbits(iso, I.order))
 
           (IsoResult(newOs, p, edges), true)
         }
