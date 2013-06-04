@@ -8,6 +8,25 @@ object samples {
   val empty = Graph.empty
   val single = Graph.empty.addVertex
 
+  def allOfOrder(n: Int): List[Graph] = {
+    val MaxA = n - 1
+    val MaxB = n - 2
+
+    def enum(a: Int, b: Int, es: Set[Edge]): List[Graph] = {
+      val newEs = (a > b) ? List(es, es + Edge(a, b)) | Nil
+
+      a match {
+        case MaxA ⇒ newEs map { Graph(n, _) }
+        case `b`  ⇒ Nil
+        case _    ⇒ newEs flatMap { es ⇒ 
+          enum(a, b + 1, es) ::: enum(a + 1, b, es)
+        }
+      }
+    }
+
+    if (n <= 0) List(Graph.empty) else enum(1, 0, Set.empty)
+  }
+
   /** linear graphs (chains) of order 1 to n */
   def chains(n: Int): List[Graph] = n match {
     case 1            ⇒ List(single)

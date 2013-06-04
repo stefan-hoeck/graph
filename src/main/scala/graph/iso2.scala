@@ -5,15 +5,14 @@ import scala.collection.immutable.BitSet
 import spire.syntax.cfor
 import scalaz._, Scalaz._
 
-//Less mutability, more recursion. Immutable BitSets are FAST
 package object iso2 {
   private val EmptyBS = BitSet()
 
   private val ZeroBS = BitSet(0)
 
-  /** Type alias for a mapping from node index to `Cell`
+  /** Type alias for a mapping from a graph's vertex to a `Cell`
     *
-    * The indexing is with respect of a node's index in the graph
+    * The indexing is with respect of a vertex's index in the graph
     * that is to be canonized, not with respect to the actual
     * `Partition` on the way to a canonical form
     */
@@ -21,10 +20,10 @@ package object iso2 {
 
   /** The orbits of a graph's automorphism group
     *
-    * If there is an automorphism connecting two nodes
-    * in a graph, the two nodes are in the same orbit.
+    * If there is an automorphism connecting two vertices
+    * in a graph, the two vertices are in the same orbit.
     * An entry at index i points to a `BitSet` of indices
-    * containing i and all other indices of i's orbit
+    * containing i and all other vertices of i's orbit
     *
     * Orbits are needed to prune the search tree when
     * finding a canonical labeling, but they can also
@@ -33,7 +32,7 @@ package object iso2 {
     */
   type Orbits = Array[BitSet]
 
-  /** An ordered partition of a graph's indices used
+  /** An ordered partition of a graph's vertices used
     * by the algorithms in this module.
     *
     * A partition is typically wrapped in a `IsoM`
@@ -41,7 +40,9 @@ package object iso2 {
     * array that tells us in what sets the elements
     * of the partition are grouped.
     *
-    * As an example, consider Isobutane whose indices
+    * As an example, consider Isobutane (main chain with
+    * labels 0 to 3, side chain with label 4 connected
+    * to vertice 1) whose indices
     * are in a first step grouped by degree. The resulting
     * partition will then be `(0, 3, 4, 2, 1), where vertices
     * 0, 3, and 4 are of degree 1, vertice 2 is of degree 2,
@@ -63,11 +64,11 @@ package object iso2 {
 
   def solve(g: Graph): (Permutation, Orbits) = IsoI(g).solve
 
-  /** Calculates the degree of a node i into a cell w */
-  def degreeIn(i: Int, w: Cell)(implicit I: IsoI, M: IsoM): Int = {
+  /** Calculates the degree of a vertice v into a cell w */
+  def degreeIn(v: Int, w: Cell)(implicit I: IsoI, M: IsoM): Int = {
     var res = 0
 
-    I.g neighbors i foreach { graphIndex ⇒ 
+    I.g neighbors v foreach { graphIndex ⇒ 
       if (M.cellAtGraphIndex(graphIndex).start == w.start) res += 1
     }
 
@@ -161,6 +162,7 @@ package object iso2 {
       else {
         val w = M findShatterer s
         var next = CellSets(s.pi, s.nonS, s.alpha - w.start)
+
         s.nonS foreach { partitionIndex ⇒ 
           next = shatter(M cellAtPartitionIndex partitionIndex, w, next)
         }
@@ -382,6 +384,7 @@ package object iso2 {
         }
       }
     }
+
   }
 }
 

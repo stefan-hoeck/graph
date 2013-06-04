@@ -119,9 +119,9 @@ sealed trait Graph {
 
   override def toString = {
     val header = s"Unlabeled Graph, order: $order"
-    val es = edges.toList.sorted mkString "\n"
+    val es = edges.toList.sorted mkString ", "
 
-    s"$header\n$es"
+    s"$header; $es"
   }
 
   /**
