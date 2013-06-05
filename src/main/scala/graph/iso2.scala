@@ -62,7 +62,7 @@ package object iso2 {
 
   type Degrees = Array[List[Int]]
 
-  def solve(g: Graph): (Permutation, Orbits) = IsoI(g).solve
+  def solve(g: Graph): (Permutation, Orbits) = IsoI(g) solve { _ ⇒ 0 }
 
   /** Calculates the degree of a vertice v into a cell w */
   def degreeIn(v: Int, w: Cell)(implicit I: IsoI, M: IsoM): Int = {
@@ -294,17 +294,15 @@ package object iso2 {
       Array.fill(order)(Cell(0, order))
     )
 
-    def initialOrbits: Orbits = Array.tabulate(order)(BitSet(_))
+    def initialResult(o: Orbits): IsoResult = IsoResult(
+      o, ∅[Permutation], List.fill(order)(Edge(order, order - 1)))(this)
 
-    def initialResult: IsoResult = IsoResult(initialOrbits,
-      ∅[Permutation], List.fill(order)(Edge(order, order - 1)))(this)
-
-    def solve: (Permutation, Orbits) = {
-      val res =
-        searchTree(initialCellSets, initialResult, initialIsoM)(this)._1
-
-      (res.p, res.orbitsOriginal)
-    }
+//    def solve: (Permutation, Orbits) = {
+//      val res =
+//        searchTree(initialCellSets, initialResult, initialIsoM)(this)._1
+//
+//      (res.p, res.orbitsOriginal)
+//    }
 
     /** Solves the graph isomorphism problem using an additional
       * scoring function. This can be used to solve the problem
@@ -315,35 +313,88 @@ package object iso2 {
       * scored by their index since identical vertices of degree 0
       * are in the same orbit anyway.
       */
-//    def solve(score: Int ⇒ Int): (Permutation, Orbits) = {
-//      type Triple = (Int, Int, Int)
-//
-//      val p = Array.fill(g.order)(0)
-//      var pi = BitSet()
-//      var zeroOrbit = BitSet()
-//      var highest: Triple = (-1, 0, 0)
-//      var cursor = 0
-//
-//      def triple(gi: Int): Triple = g degree gi match {
-//        case 0 ⇒ zeroOrbit += gi; (0, score(gi), gi)
-//        case x ⇒ (x, score(gi), 0)
-//      }
-//
-//      //Fill partition and pi
-//      0 until g.order map { i ⇒ triple(i) → i } sortBy { _._2 } foreach {
-//        case (t, gi) ⇒ {
-//          p(cursor) = gi
-//          cursor += 1
-//
-//          if (t > highest) {
-//            highest = t
-//            pi += gi
-//          }
-//        }
-//      }
-//
-//      ???
-//    }
+    def solve(score: Int ⇒ Int): (Permutation, Orbits) =
+      initial(score) match {
+        case (m, sets, o) ⇒ {
+          val res = searchTree(sets, initialResult(o), m)(this)._1
+
+          (res.p, res.orbitsOriginal)
+        }
+      }
+
+    def initial(score: Int ⇒ Int): (IsoM, CellSets, Orbits) = {
+      type Triple = (Int, Int, Int) //(degree, score, index)
+      def triple(gi: Int): Triple = (g degree gi, score(gi), gi)
+      val m = initialIsoM
+      val orbits = Array.tabulate(g.order)(BitSet(_)) //initial orbits
+      var pi = EmptyBS //start indices of initial cells
+      var nonS = EmptyBS //start indices non-singleton cells
+      var alpha = EmptyBS //start indices of shattering cells
+      var zeroOrbit = EmptyBS //accumulates vertices of degree zero
+      var highest = (-1, 0) //score of highest vertex visited so far
+      var cursor = 0 //actual position in the array
+      var cellStart = 0 //start index actual cell
+      val (nulls, rest) =
+        (0 until g.order map triple sorted) partition (_._1 == 0)
+
+      def adjustZeroOrbits() {
+        zeroOrbit foreach { gi2 ⇒ orbits(gi2) = zeroOrbit }
+      }
+
+      //vertices of degree zero
+      // -belong to the same orbit if they have the same score
+      // -all are added to their own trivial cell which is added to pi
+      //  but not to alpha
+      nulls foreach { case (d, s, gi) ⇒ 
+        m.p(cursor) = gi
+        m.setCellAtGraphIndex(gi, Cell(cursor, 1))
+        pi += cursor
+        cursor += 1
+        cellStart = cursor
+
+        //check if found a set of zero degree vertices with new score
+        if (highest < (d, s)) {
+          //yes ⇒ update orbits then reset zeroOrbit
+          adjustZeroOrbits()
+          zeroOrbit = BitSet(gi)
+          highest = (0, s)
+        } else {
+          //no ⇒ add vertex to actual zeroOrbit set
+          zeroOrbit += gi
+        }
+      }
+
+      adjustZeroOrbits()
+
+      def cellClose() {
+        val newCell = Cell(cellStart, cursor - cellStart)
+        cellStart = cursor
+
+        cfor(newCell.start)(_ <= newCell.end, 1+) { partitionIndex ⇒ 
+          m.setCellAtPartitionIndex(partitionIndex, newCell)
+        }
+
+        if (newCell.size > 1) nonS += newCell.start
+      }
+
+      rest foreach { case (d, s, gi) ⇒ 
+        m.p(cursor) = gi
+        
+        //start new cell
+        if (highest < (d, s)) {
+          pi += cursor
+          alpha += cursor
+          cellClose()
+          highest = (d, s)
+        }
+
+        cursor += 1
+      }
+
+      cellClose() //closes the last opened cell
+
+      (m, CellSets(pi, nonS, alpha), orbits)
+    }
   }
 
   /** The (for efficiency reasons) mutable part of a graph isomorphism
