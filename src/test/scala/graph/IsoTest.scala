@@ -92,6 +92,27 @@ object IsoTest extends Properties("iso") {
     }
   }
 
+  property("solve_isCanonical") = {
+    val order = 5
+    val gs = test.samples allOfOrder order
+    val ps = Permutation ofSize order toList
+
+    gs ∀ { testCanonical(_, ps) }
+  }
+
+  def testCanonical(g: Graph, ps: List[Permutation]): Boolean = {
+    def canonicalSet(g: Graph) = (iso2 solve g)._1 mapGraph g edges
+
+    val sets = ps map { p ⇒ canonicalSet(p mapGraph g) } toSet
+
+    if (sets.size > 1) {
+      println(g)
+      println(sets mkString "\n")
+    }
+
+    sets.size ≟ 1
+  }
+
   def refinePermutation(g: Graph): List[Int] = refine(g)._1
 
   def refineCells(g: Graph): List[Cell] = refine(g)._2
