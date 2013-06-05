@@ -14,30 +14,13 @@ import com.google.caliper.Param
   *
   */
 class IsoBenchmark extends BMark {
-  @Param(Array("10", "100", "500")) val size = 0
-  var chains: List[Graph] = Nil
-  var rings: List[Graph] = Nil
+  var gs: List[Graph] = Nil
 
   override def setUp() {
-    chains = graph.test.samples.chains(size)
-    rings = graph.test.samples.rings(size)
+    gs = test.samples allOfOrder 6
   }
 
-  def timeRefineChains(n: Int) = run(n) {
-    chains.tail.tail foreach { iso.refine }
-  }
-
-  def timeRefineRings(n: Int) = run(n) {
-    chains.tail.tail foreach { iso.refine }
-  }
-
-  def timeRefineChains2(n: Int) = run(n) {
-    chains.tail.tail foreach { iso2.refine }
-  }
-
-  def timeRefineRings2(n: Int) = run(n) {
-    chains.tail.tail foreach { iso2.refine }
-  }
+  def timeSolve(n: Int) = run(n) { gs.par map iso2.solve size }
 }
 
 // vim: set ts=2 sw=2 et:
