@@ -7,10 +7,6 @@ import spire.syntax.cfor
   *
   * Permutations form a group under composition
   */
-//@TODO: Possible performance boost: Do not copy array at every
-//combination but delegate to combined permutations. Keep track
-//of depth of this 'permutation tree' and at a given depth create
-//a new array to memoize the results.
 sealed trait Permutation {
   def apply(i: Int): Int
 

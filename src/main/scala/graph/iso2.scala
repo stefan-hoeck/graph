@@ -305,6 +305,45 @@ package object iso2 {
 
       (res.p, res.orbitsOriginal)
     }
+
+    /** Solves the graph isomorphism problem using an additional
+      * scoring function. This can be used to solve the problem
+      * for labeled graphs.
+      *
+      * Vertices are first sorted by degree and then by their
+      * scoring function. Vertices of degree 0 are then
+      * scored by their index since identical vertices of degree 0
+      * are in the same orbit anyway.
+      */
+//    def solve(score: Int ⇒ Int): (Permutation, Orbits) = {
+//      type Triple = (Int, Int, Int)
+//
+//      val p = Array.fill(g.order)(0)
+//      var pi = BitSet()
+//      var zeroOrbit = BitSet()
+//      var highest: Triple = (-1, 0, 0)
+//      var cursor = 0
+//
+//      def triple(gi: Int): Triple = g degree gi match {
+//        case 0 ⇒ zeroOrbit += gi; (0, score(gi), gi)
+//        case x ⇒ (x, score(gi), 0)
+//      }
+//
+//      //Fill partition and pi
+//      0 until g.order map { i ⇒ triple(i) → i } sortBy { _._2 } foreach {
+//        case (t, gi) ⇒ {
+//          p(cursor) = gi
+//          cursor += 1
+//
+//          if (t > highest) {
+//            highest = t
+//            pi += gi
+//          }
+//        }
+//      }
+//
+//      ???
+//    }
   }
 
   /** The (for efficiency reasons) mutable part of a graph isomorphism
