@@ -346,6 +346,7 @@ package object iso2 {
 
     def permutation: Permutation = Permutation(p)
 
+    //For testing
     private[graph] def lists: (List[Int], List[Cell]) =
       (p.toList, c.toList)
 
@@ -371,7 +372,7 @@ package object iso2 {
     *
     * `orbitsOriginal` contains the orbits of the graph's automorphism group
     * (given in the indices of the original graph)
-    * (see also description of `Orbits` type alias)
+    * (see also description of `Orbits` class)
     *
     * `p` is the permutation that transforms the given graph to
     * its canonically labeled form
