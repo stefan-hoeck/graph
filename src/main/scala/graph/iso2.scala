@@ -297,13 +297,6 @@ package object iso2 {
     def initialResult(o: Orbits): IsoResult = IsoResult(
       o, ∅[Permutation], List.fill(order)(Edge(order, order - 1)))(this)
 
-//    def solve: (Permutation, Orbits) = {
-//      val res =
-//        searchTree(initialCellSets, initialResult, initialIsoM)(this)._1
-//
-//      (res.p, res.orbitsOriginal)
-//    }
-
     /** Solves the graph isomorphism problem using an additional
       * scoring function. This can be used to solve the problem
       * for labeled graphs.
