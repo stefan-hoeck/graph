@@ -9,7 +9,7 @@ object Main {
     Runner.main(classOf[IsoBenchmark], args)
   }
 //  def main(args: Array[String]) {
-//    val gs = test.samples allOfOrder 7 take 1000000
+//    val gs = test.samples allOfOrder 7 take 500000
 //    1 to 10 foreach { _ ⇒ lucky7(gs) }
 //  }
 //

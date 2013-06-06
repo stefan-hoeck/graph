@@ -18,20 +18,6 @@ package object iso2 {
     */
   type Cells = Array[Cell]
 
-  /** The orbits of a graph's automorphism group
-    *
-    * If there is an automorphism connecting two vertices
-    * in a graph, the two vertices are in the same orbit.
-    * An entry at index i points to a `BitSet` of indices
-    * containing i and all other vertices of i's orbit
-    *
-    * Orbits are needed to prune the search tree when
-    * finding a canonical labeling, but they can also
-    * be of interest in other applications for instance
-    * when finding chiral centers in a Molecule
-    */
-  type Orbits = Array[BitSet]
-
   /** An ordered partition of a graph's vertices used
     * by the algorithms in this module.
     *
@@ -92,56 +78,6 @@ package object iso2 {
       }
 
     run(x.end, Int.MaxValue, Int.MinValue)
-  }
-
-
-
-  def mergeOrbits(a: Orbits, b: Orbits): Orbits = {
-    val res = Array.tabulate(a.size){ i ⇒ a(i) | b(i) }
-    val handled = Array.fill(a.size)(false)
-
-    cfor(0)(_ < a.size, _ + 1){ i ⇒ 
-      if (! handled(i) && b(i).size > 1) {
-        handled(i) = true
-        var newOrbit: BitSet = res(i)
-        var mustVisit = newOrbit filterNot handled
-
-        while (mustVisit.nonEmpty) {
-          val head = mustVisit.head
-          handled(head) = true
-
-          mustVisit = mustVisit.tail 
-          res(head) foreach { j ⇒ 
-            if (! handled(j)) mustVisit += j
-          }
-          newOrbit += head
-        }
-
-        newOrbit foreach { j ⇒ res(j) = newOrbit }
-      }
-    }
-
-    res
-  }
-
-  /** Generates the orbit sets from a permutation */
-  def permutationToOrbits(p: Permutation, size: Int): Orbits = {
-    val res = Array.fill(size)(BitSet.empty)
-
-    cfor(0)(_ < res.size, _ + 1){ i ⇒ 
-      if (res(i).isEmpty) {
-        var x = p(i)
-        var bs: BitSet = BitSet(i)
-        while(x != i) {
-          bs += x
-          x = p(x)
-        }
-
-        bs foreach { j ⇒ res(j) = bs }
-      }
-    }
-
-    res
   }
 
   //For testing
@@ -386,7 +322,7 @@ package object iso2 {
 
       cellClose() //closes the last opened cell
 
-      (m, CellSets(pi, nonS, alpha), orbits)
+      (m, CellSets(pi, nonS, alpha), Orbits(orbits))
     }
   }
 
@@ -460,14 +396,12 @@ package object iso2 {
         case Ordering.GT ⇒ (IsoResult(orbitsOriginal, inv, es), false)
         case Ordering.EQ ⇒ {
           val iso = p1 compose p
-          val newOs =
-            mergeOrbits(orbitsOriginal, permutationToOrbits(iso, I.order))
+          val newOs = orbitsOriginal merge iso.orbits
 
           (IsoResult(newOs, p, edges), true)
         }
       }
     }
-
   }
 }
 

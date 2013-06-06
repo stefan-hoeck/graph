@@ -1,6 +1,8 @@
 package graph
 
+import collection.immutable.BitSet
 import spire.syntax.cfor
+import scalaz.syntax.monoid._
 
 /** Represents a permutation of a sequence of values (which could be
   * the nodes of a graph)
@@ -16,6 +18,8 @@ sealed trait Permutation {
   def compose(that: Permutation): Permutation
 
   def inverse: Permutation
+
+  def orbits: Orbits
 
   final def mapEdge(e: Edge): Edge = Edge(apply(e.a), apply(e.b))
 
@@ -44,6 +48,10 @@ object Permutation {
     def append(a: Permutation, b: ⇒ Permutation) = a compose b
   }
 
+  
+
+  /**** Implementing classes ****/
+
   private case class Impl(p: Array[Int]) extends Permutation {
     def apply(i: Int): Int = if (i < p.size) p(i) else i
 
@@ -67,12 +75,32 @@ object Permutation {
 
       s"($ids)"
     }
+
+    def orbits: Orbits = {
+      val res = Array.fill(p.size)(BitSet.empty)
+
+      cfor(0)(_ < res.size, _ + 1){ i ⇒ 
+        if (res(i).isEmpty) {
+          var x = p(i)
+          var bs: BitSet = BitSet(i)
+          while(x != i) {
+            bs += x
+            x = p(x)
+          }
+
+          bs foreach { j ⇒ res(j) = bs }
+        }
+      }
+
+      Orbits(res)
+    }
   }
 
   private case object Ident extends Permutation {
     def apply(i: Int) = i
     def compose(that: Permutation) = that
     def inverse = this
+    val orbits = ∅[Orbits]
     override def toString = "Identity Permutation"
   }
 }

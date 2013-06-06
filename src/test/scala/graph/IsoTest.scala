@@ -75,38 +75,6 @@ object IsoTest extends Properties("iso") {
     rings100.tail ∀ testCells
   }
 
-  property("permutationToOrbits_isPartition") = forAll { p: Permutation ⇒ 
-    val orbits = iso2 permutationToOrbits(p, 7)
-    orbits.fold(BitSet.empty)(_ | _) == BitSet(0 until 7: _*)
-  }
-
-  property("permutationToOrbits_connections") = forAll { p: Permutation ⇒ 
-    val orbits = iso2 permutationToOrbits(p, 7)
-    List.range(0, 7) ∀ { i ⇒ orbits(i)(p(i)) }
-  }
-
-  property("mergeOrbits_isPartition") = forAll {
-    p: (Permutation, Permutation) ⇒ 
-    val (p1, p2) = p
-    val o1 = iso2 permutationToOrbits(p1, 7)
-    val o2 = iso2 permutationToOrbits(p2, 7)
-    val merged = mergeOrbits(o1, o2)
-
-    merged.fold(BitSet.empty)(_ | _) == BitSet(0 until 7: _*)
-  }
-
-  property("mergeOrbits_connections") = forAll {
-    p: (Permutation, Permutation) ⇒ 
-    val (p1, p2) = p
-    val o1 = iso2 permutationToOrbits(p1, 7)
-    val o2 = iso2 permutationToOrbits(p2, 7)
-    val merged = mergeOrbits(o1, o2)
-
-    List.range(0, 7) ∀ { i ⇒ 
-      merged(i)(p1(i)) && merged(i)(p2(i))
-    }
-  }
-
   //the initial partition of an unlabeled (unscored) graph
   //must be sorted by degree
   property("initial_partition_unscored") = {
