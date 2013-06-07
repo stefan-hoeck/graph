@@ -48,6 +48,10 @@ package object iso2 {
 
   type Degrees = Array[List[Int]]
 
+  def canonize(g: Graph): Graph = solve(g) match {
+    case (p, _) ⇒ p mapGraph g
+  }
+
   def solve(g: Graph): (Permutation, Orbits) = IsoI(g) solve { _ ⇒ 0 }
 
   /** Calculates the degree of a vertice v into a cell w */

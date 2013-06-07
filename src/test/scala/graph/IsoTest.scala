@@ -75,127 +75,110 @@ object IsoTest extends Properties("iso") {
     rings100.tail ∀ testCells
   }
 
-  //the initial partition of an unlabeled (unscored) graph
-  //must be sorted by degree
-  property("initial_partition_unscored") = {
-    def test(g: Graph) = 
-      (ids(g) sortBy { i ⇒ (g degree i, i) }) ≟
-      iniIsoM(g).p.toList
+  property("initial_unscored") = {
+    def test(g: Graph) = {
+      val (m, c, os) = iniUnscored(g)
+
+      iniPartitionUnscored(g, m) &&
+      iniCellsDegree0Unscored(g, m) &&
+      iniCellsNon0Unscored(g, m) &&
+      iniPiUnscored(g, c, m) &&
+      iniNonSUnscored(g, c, m) &&
+      iniAlphaUnscored(g, c, m) &&
+      iniOrbitsDeg0Unscored(g, os) &&
+      iniOrbitsDegNon0Unscored(g, os)
+    }
 
     sixes ∀ test
   }
+
+  //the initial partition of an unlabeled (unscored) graph
+  //must be sorted by degree
+  def iniPartitionUnscored(g: Graph, m: IsoM) =
+    (ids(g) sortBy (i ⇒ (g degree i, i))) ≟ m.p.toList
 
   //checks that each vertex of degree zero sits in
   //its own cell
-  property("initial_cells_degree0_unscored") = {
-    def test(g: Graph) = {
-      val m = iniIsoM(g)
-
-      idsDeg0(g) ∀ { gi ⇒ m cellAtGraphIndex gi match {
-        case Cell(start, size) ⇒ (size ≟ 1) && (m.p(start) ≟ gi)
-      }}
-    }
-
-    sixes ∀ test
-  }
+  def iniCellsDegree0Unscored(g: Graph, m: IsoM) =
+    idsDeg0(g) ∀ { gi ⇒ m cellAtGraphIndex gi match {
+      case Cell(start, size) ⇒ (size ≟ 1) && (m.p(start) ≟ gi)
+    }}
 
   //checks that vertices of degree > 0 are grouped in a cell
-  property("initial_cells_degree0_unscored") = {
-    def test(g: Graph) = {
-      val m = iniIsoM(g)
-
-      (idsDegNon0(g) groupBy g.degree toList) ∀ { case (d, is) ⇒ 
-        is ∀ { gi ⇒ m.cellAtGraphIndex(gi).size ≟ is.size }
-      }
+  def iniCellsNon0Unscored(g: Graph, m: IsoM) =
+    (idsDegNon0(g) groupBy g.degree toList) ∀ { case (d, is) ⇒ 
+      is ∀ { gi ⇒ m.cellAtGraphIndex(gi).size ≟ is.size }
     }
-
-    sixes ∀ test
-  }
 
   //checks that pi contains the start values
   //of all cells
-  property("initial_pi_unscored") = {
-    def test(g: Graph) = {
-      val (m, c, o) = iniUnscored(g)
-
-      BitSet(m.cellList map { _.start }: _*) == c.pi
-    }
-
-    sixes ∀ test
-  }
+  def iniPiUnscored(g: Graph, c: CellSets, m: IsoM) =
+    BitSet(m.cellList map { _.start }: _*) == c.pi
 
   //checks that nonS contains the start values
   //of all non-singleton cells
-  property("initial_nonS_unscored") = {
-    def test(g: Graph) = {
-      val (m, c, o) = iniUnscored(g)
-      val cs = m.cellList collect {
-        case Cell(start, size) if size > 1 ⇒ start
-      }
-
-      BitSet(cs: _*) == c.nonS
+  def iniNonSUnscored(g: Graph, c: CellSets, m: IsoM) = {
+    val cs = m.cellList collect {
+      case Cell(start, size) if size > 1 ⇒ start
     }
 
-    sixes ∀ test
+    BitSet(cs: _*) == c.nonS
   }
 
   //checks that alpha contains the start values
   //of all cells that do not hold vertices of
   //degree zero
-  property("initial_nonS_unscored") = {
-    def test(g: Graph) = {
-      val (m, c, o) = iniUnscored(g)
-      val cs = idsDegNon0(g) map { m.cellAtGraphIndex(_).start }
+  def iniAlphaUnscored(g: Graph, c: CellSets, m: IsoM) = {
+    val cs = idsDegNon0(g) map { m.cellAtGraphIndex(_).start }
 
-      BitSet(cs: _*) == c.alpha
-    }
-
-    sixes ∀ test
+    BitSet(cs: _*) == c.alpha
   }
 
   //checks that all vertices of degree 0 are in the
   //same orbit
-  property("initial_orbits_degree0_unscored") = {
-    def test(g: Graph) = {
-      val os = iniOrbits(g)
-      val bs = BitSet(idsDeg0(g): _*)
+  def iniOrbitsDeg0Unscored(g: Graph, os: Orbits) = {
+    val bs = BitSet(idsDeg0(g): _*)
 
-      bs.toList ∀ { i ⇒ os(i) == bs }
-    }
-
-    sixes ∀ test
+    bs.toList ∀ (os(_) == bs)
   }
 
   //checks that all vertices of degree > 0 are in
   //their own singleton orbit
-  property("initial_orbits_degreeNon0_unscored") = {
-    def test(g: Graph) = {
-      val os = iniOrbits(g)
-      idsDegNon0(g) ∀ { i ⇒ os(i) == BitSet(i) }
-    }
-
-    sixes ∀ test
-  }
+  def iniOrbitsDegNon0Unscored(g: Graph, os: Orbits) =
+    idsDegNon0(g) ∀ (i ⇒ os(i) == BitSet(i))
 
   property("solve_isCanonical") = {
-    val order = 5
+    val order = 6
     val gs = test.samples allOfOrder order
     val ps = Permutation ofSize order toList
 
-    gs ∀ { testCanonical(_, ps) }
+    testCanonical(gs, ps)
   }
 
-  def testCanonical(g: Graph, ps: List[Permutation]): Boolean = {
-    def canonicalSet(g: Graph) = (iso2 solve g)._1 mapGraph g edges
+  //Groups graphs by their canonical form
+  //Iterates then through the pairs, generates all permutations
+  //of the canonical form and checks that it contains exactly the same
+  //graphs as the list paired with the canonical form
+  def testCanonical(gs: List[Graph], ps: List[Permutation]): Boolean = {
+    implicit val LOrder = Order[Set[Edge]].toScalaOrdering
 
-    val sets = ps map { p ⇒ canonicalSet(p mapGraph g) } toSet
+    def canonicalSet(g: Graph) = iso2.canonize(g).edges
 
-    if (sets.size > 1) {
-      println(g)
-      println(sets mkString "\n")
+    def transformCanonical(es: Set[Edge])(p: Permutation) =
+      es map p.mapEdge
+
+    def testPair(p: (Set[Edge], List[Graph])) = p match {
+      case (es, gs) ⇒ {
+        val sets = (ps map transformCanonical(es)).toSet
+        val graphSets = gs map (_.edges) toSet
+
+        sets ≟ graphSets
+      }
     }
 
-    sets.size ≟ 1
+    val map = gs groupBy canonicalSet
+
+    map.toList ∀ testPair
   }
 
   def refinePermutation(g: Graph): List[Int] = refine(g)._1
@@ -209,12 +192,6 @@ object IsoTest extends Properties("iso") {
   def idsDeg0(g: Graph) = ids(g) filter { g.degree(_) ≟ 0 }
 
   def idsDegNon0(g: Graph) = ids(g) filter { g.degree(_) > 0 }
-
-  def iniIsoM(g: Graph) = iniUnscored(g)._1
-
-  def iniCells(g: Graph) = iniUnscored(g)._2
-
-  def iniOrbits(g: Graph) = iniUnscored(g)._3
 
   def iniUnscored(g: Graph) = IsoI(g) initial { _ ⇒ 0 }
 }
