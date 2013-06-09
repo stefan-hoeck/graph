@@ -54,28 +54,21 @@ package object iso2 {
 
   def solve(g: Graph): (Permutation, Orbits) = IsoI(g) solve { _ ⇒ 0 }
 
-  /** Calculates the degree of a vertice v into a cell w */
-  def degreeIn(v: Int, w: Cell)(implicit I: IsoI, M: IsoM): Int = {
-    var res = 0
-
-    I.g neighbors v foreach { graphIndex ⇒ 
-      if (M.cellAtGraphIndex(graphIndex).start == w.start) res += 1
-    }
-
-    res //benchmarked and optimized
-  }
-
   /** Returns an array of lists containing at index i all vertices
     * in cell x that have a degree of i in cell w
     */
-  def fillDegrees(x: Cell, w: Cell)(implicit I: IsoI, M: IsoM): Degrees = {
+  private def fillDegrees(x: Cell, w: Cell)
+                         (implicit I: IsoI, M: IsoM): Degrees = {
     val ds = I.newDegrees
+
+    def degreeInW(v: Int): Int =
+      I.g neighbors v count (M.cellAtGraphIndex(_).start == w.start)
 
     @tailrec def run(i: Int, minD: Int, maxD: Int): Degrees =
       if (i < x.start) { if (minD != maxD) ds else null }
       else {
         val index = M.p(i)
-        val d = degreeIn(index, w)
+        val d = degreeInW(index)
         ds(d) ::= index
 
         run(i - 1, d min minD, d max maxD) //fill in reverse order
@@ -94,10 +87,9 @@ package object iso2 {
     m.lists
   }
 
-  def refineSets(sets: CellSets)
-                (implicit I: IsoI, M: IsoM): CellSets = {
-    @tailrec
-    def run(s: CellSets): CellSets =
+  private def refineSets(sets: CellSets)
+                        (implicit I: IsoI, M: IsoM): CellSets = {
+    @tailrec def run(s: CellSets): CellSets =
       if (s.alpha.isEmpty || s.nonS.isEmpty) s
       else {
         val w = M findShatterer s
@@ -127,7 +119,7 @@ package object iso2 {
       var result = best
       var orbitsChanged = false
 
-      cfor(cell.start)(_ <= cell.end, _ + 1){ partitionIndex ⇒ 
+      cell foreach { partitionIndex ⇒ 
         val graphIndex = m p partitionIndex
         if (! ignore(graphIndex)) {
           val p = splitAt(refined, m, partitionIndex)
@@ -210,6 +202,8 @@ package object iso2 {
   final case class Cell(start: Int, size: Int) {
     /** The index of the last item of this cell in the partition array */
     val end = start + size - 1
+
+    def foreach(f: Int ⇒ Unit) { cfor(start)(_ <= end, 1+)(f) }
   }
 
   /** The immutable part of a graph isomorphism calculation */
@@ -303,9 +297,7 @@ package object iso2 {
         val newCell = Cell(cellStart, cursor - cellStart)
         cellStart = cursor
 
-        cfor(newCell.start)(_ <= newCell.end, 1+) { partitionIndex ⇒ 
-          m.setCellAtPartitionIndex(partitionIndex, newCell)
-        }
+        newCell foreach { m.setCellAtPartitionIndex(_, newCell) }
 
         if (newCell.size > 1) nonS += newCell.start
       }
@@ -354,7 +346,7 @@ package object iso2 {
     private[graph] def lists: (List[Int], List[Cell]) =
       (p.toList, c.toList)
 
-    def cellList: List[Cell] = c.distinct sortBy { _.start } toList
+    def cellList: List[Cell] = c.distinct sortBy (_.start) toList
 
     def partitionList: List[List[Int]] =
       cellList map { c ⇒ c.start to c.end map p toList }
