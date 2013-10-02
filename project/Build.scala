@@ -4,7 +4,7 @@ import Keys._
 object BuildSettings {
   val buildOrganization = "graph"
   val buildVersion = "0.1.0-SNAPSHOT"
-  val buildScalaVersion = "2.10.1"
+  val buildScalaVersion = "2.10.3"
 
   val buildSettings = Defaults.defaultSettings ++ Seq (
     organization := buildOrganization,
@@ -25,7 +25,7 @@ object BuildSettings {
 
 object Dependencies {
   val scalaz = "org.scalaz"
-  val scalazV = "7.0.0"
+  val scalazV = "7.0.3"
 
   val scalaz_core = scalaz %% "scalaz-core" % scalazV
   val scalaz_effect = scalaz %% "scalaz-effect" % scalazV
